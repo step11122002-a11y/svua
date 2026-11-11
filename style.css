@@ -31,7 +31,7 @@ svg .fill { fill: currentColor; stroke: none; }
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
 
-#app { height: 100%; display: grid; grid-template-rows: auto 1fr auto; padding: var(--safe-t) var(--safe-r) 0 var(--safe-l); }
+#app { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; padding: var(--safe-t) var(--safe-r) 0 var(--safe-l); }
 
 /* Монограмма SV ♥ UA */
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 0 10px; height: 36px; border-radius: 10px; background: var(--brand);
