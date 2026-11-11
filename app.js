@@ -296,8 +296,8 @@ function paintDrag(el, dx, dy) {
   const next = el.previousElementSibling;
   if (next && next.classList.contains("back1")) {
     const k = Math.min(1, Math.abs(dx) / 140);
-    next.style.transform = `translateY(${10 - 10 * k}px) scale(${0.96 + 0.04 * k})`;
-    next.style.filter = `brightness(${0.7 + 0.3 * k})`;
+    next.style.transform = `scale(${0.94 + 0.06 * k})`;
+    next.style.filter = `brightness(${0.6 + 0.4 * k})`;
   }
 }
 function clearGlow() {
@@ -506,7 +506,7 @@ function bind() {
 
 
 // ---------- iOS 26: в режиме «с экрана Домой» окно считается ниже экрана — растягиваем на весь экран ----------
-const VERSION = 5;
+const VERSION = 6;
 const STANDALONE = window.navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
 const IOS = /iP(hone|od|ad)/.test(navigator.platform) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
 function fitHeight() {
