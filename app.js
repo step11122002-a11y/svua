@@ -506,7 +506,7 @@ function bind() {
 
 
 // ---------- iOS 26: в режиме «с экрана Домой» окно считается ниже экрана — растягиваем на весь экран ----------
-const VERSION = 6;
+const VERSION = 7;
 const STANDALONE = window.navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
 const IOS = /iP(hone|od|ad)/.test(navigator.platform) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
 function fitHeight() {
@@ -531,7 +531,12 @@ function screenInfo() {
 async function start() {
   bind();
   setSync(S.sync);
-  fitHeight(); addEventListener("resize", fitHeight); addEventListener("orientationchange", () => setTimeout(fitHeight, 300));
+  // iOS при запуске сначала сообщает полную высоту экрана и только потом настоящую — перепроверяем несколько раз.
+  fitHeight(); [150, 500, 1200, 2500].forEach(t => setTimeout(fitHeight, t));
+  addEventListener("resize", fitHeight); visualViewport?.addEventListener("resize", fitHeight);
+  addEventListener("orientationchange", () => setTimeout(fitHeight, 300));
+  addEventListener("pageshow", fitHeight);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") setTimeout(fitHeight, 200); });
   try {
     const r = await fetch("films.json");
     S.films = await r.json();
