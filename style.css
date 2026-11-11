@@ -191,3 +191,7 @@ main { min-height: 0; position: relative; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
 .debug { margin: 4px 0 0; font: 11px/1.4 ui-monospace, Menlo, monospace; opacity: .7; -webkit-user-select: text; user-select: text; }
+
+/* iOS 26 «с экрана Домой»: окно меньше экрана — все слои на весь экран тянем по --full-h (ставит app.js) */
+.overlay, .glow { bottom: auto; height: var(--full-h, 100%); }
+.glow { top: 0; }

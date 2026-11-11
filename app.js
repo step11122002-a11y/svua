@@ -506,16 +506,18 @@ function bind() {
 
 
 // ---------- iOS 26: в режиме «с экрана Домой» окно считается ниже экрана — растягиваем на весь экран ----------
-const VERSION = 3;
+const VERSION = 4;
 const STANDALONE = window.navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
 const IOS = /iP(hone|od|ad)/.test(navigator.platform) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
 function fitHeight() {
   const app = $("#app");
-  if (!(STANDALONE && IOS)) { app.style.height = ""; return; }
+  if (!(STANDALONE && IOS)) { app.style.height = ""; document.documentElement.style.removeProperty("--full-h"); return; }
   const landscape = Math.abs(window.orientation || 0) === 90;
   const full = landscape ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+  const h = Math.max(window.innerHeight, full) + "px";
   app.style.bottom = "auto";
-  app.style.height = Math.max(window.innerHeight, full) + "px";
+  app.style.height = h;
+  document.documentElement.style.setProperty("--full-h", h);   // для меню, оверлеев и подсветки
 }
 function screenInfo() {
   const probe = document.createElement("div");
