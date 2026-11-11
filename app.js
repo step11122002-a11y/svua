@@ -23,6 +23,8 @@ const S = {
   // ratings[player][kp] = { l: true|false, at: ms }
   ratings: LS.get("ratings", { stepan: {}, yulia: {} }),
   hidden: new Set(LS.get("hidden", [])),
+  // watched[player][kp] = { s: 1..10 | null, at: ms } — «Просмотрено» и оценка в звёздах
+  watched: Object.assign({ stepan: {}, yulia: {} }, LS.get("watched", {})),
   queue: LS.get("queue", []),          // неотправленные изменения
   seenMatches: new Set(LS.get("seenMatches", [])),
   history: [],                          // для «Вернуть» (только эта сессия)
@@ -33,7 +35,7 @@ const S = {
 
 function persist() {
   LS.set("ratings", S.ratings); LS.set("hidden", [...S.hidden]); LS.set("queue", S.queue);
-  LS.set("seenMatches", [...S.seenMatches]);
+  LS.set("seenMatches", [...S.seenMatches]); LS.set("watched", S.watched);
 }
 
 // ---------- Фильмы ----------
@@ -66,9 +68,32 @@ const likes = p => Object.keys(S.ratings[p]).filter(k => S.ratings[p][k].l).map(
 const nopes = p => Object.keys(S.ratings[p]).filter(k => !S.ratings[p][k].l).map(Number);
 const rating = (p, kp) => S.ratings[p][kp];
 
+// ---------- Просмотрено ----------
+const seen = (p, kp) => S.watched[p][kp];
+const bothSeen = kp => !!(seen("stepan", kp) && seen("yulia", kp));
+const WATCHED_VERB = { stepan: "посмотрел", yulia: "посмотрела" };
+function avgScore(kp) {
+  const xs = ["stepan", "yulia"].map(p => seen(p, kp)?.s).filter(Boolean);
+  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+}
+const fmtAvg = v => (v == null ? "—" : Number.isInteger(v) ? String(v) : v.toFixed(1).replace(".", ","));
+function watchedList() {
+  const kps = Object.keys(S.watched.stepan).map(Number).filter(kp => bothSeen(kp) && S.byId.has(kp));
+  return kps.map(kp => S.byId.get(kp)).sort((a, b) => {
+    const x = avgScore(a.kp), y = avgScore(b.kp);
+    if (x == null || y == null) return (x == null) - (y == null) || a.t.localeCompare(b.t, "ru");
+    return y - x || a.t.localeCompare(b.t, "ru");
+  });
+}
+function setWatched(p, kp, score /* undefined = снять отметку, null = без оценки, 1..10 */) {
+  if (score === undefined) { delete S.watched[p][kp]; S.queue.push({ op: "wdel", p, kp }); }
+  else { S.watched[p][kp] = { s: score, at: Date.now() }; S.queue.push({ op: "wset", p, kp, s: score }); }
+  persist(); flushSoon();
+}
+
 function matches() {
   const o = S.ratings[other("stepan")];
-  return likes("stepan").filter(kp => o[kp]?.l && !S.hidden.has(kp) && S.byId.has(kp))
+  return likes("stepan").filter(kp => o[kp]?.l && !S.hidden.has(kp) && !bothSeen(kp) && S.byId.has(kp))
     .map(kp => S.byId.get(kp)).sort((a, b) => a.t.localeCompare(b.t, "ru"));
 }
 
@@ -126,6 +151,11 @@ async function flush() {
         await api("/hidden?on_conflict=kp", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([{ kp: it.kp }]) });
       } else if (it.op === "unhide") {
         await api(`/hidden?kp=eq.${it.kp}`, { method: "DELETE" });
+      } else if (it.op === "wset") {
+        await api("/watched?on_conflict=player,kp", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify([{ player: it.p, kp: it.kp, score: it.s, updated_at: new Date().toISOString() }]) });
+      } else if (it.op === "wdel") {
+        await api(`/watched?player=eq.${it.p}&kp=eq.${it.kp}`, { method: "DELETE" });
       } else if (it.op === "reset") {
         await api(`/ratings?player=eq.${it.p}`, { method: "DELETE" });
       }
@@ -147,6 +177,19 @@ async function pull() {
       rows.push(...page); if (page.length < 1000) break;
     }
     const hidden = await api("/hidden?select=kp");
+    let wfresh = { stepan: {}, yulia: {} };
+    try {   // «Просмотрено» не должно ломать синхронизацию обычных оценок
+      const wrows = [];
+      for (let off = 0; ; off += 1000) {
+        const page = await api(`/watched?select=player,kp,score,updated_at&order=player.asc,kp.asc&limit=1000&offset=${off}`);
+        wrows.push(...page); if (page.length < 1000) break;
+      }
+      for (const r of wrows) if (wfresh[r.player]) wfresh[r.player][r.kp] = { s: r.score ?? null, at: Date.parse(r.updated_at) || 0 };
+    } catch (e) { console.warn("sync watched", e); wfresh = JSON.parse(JSON.stringify(S.watched)); }
+    for (const it of S.queue) {
+      if (it.op === "wset") wfresh[it.p][it.kp] = { s: it.s, at: Date.now() };
+      else if (it.op === "wdel") delete wfresh[it.p][it.kp];
+    }
     const fresh = { stepan: {}, yulia: {} };
     for (const r of rows) if (fresh[r.player]) fresh[r.player][r.kp] = { l: r.liked, at: Date.parse(r.updated_at) || 0 };
     // Поверх — то, что ещё не успело уйти на сервер.
@@ -156,7 +199,7 @@ async function pull() {
       else if (it.op === "reset") fresh[it.p] = {};
     }
     const before = new Set(matches().map(f => f.kp));
-    S.ratings = fresh;
+    S.ratings = fresh; S.watched = wfresh;
     S.hidden = new Set(hidden.map(h => h.kp));
     for (const it of S.queue) { if (it.op === "hide") S.hidden.add(it.kp); if (it.op === "unhide") S.hidden.delete(it.kp); }
     S.lastSync = Date.now(); LS.set("lastSync", S.lastSync);
@@ -191,8 +234,10 @@ function render() {
   $("#view-deck").hidden = S.tab !== "deck";
   $("#view-matches").hidden = S.tab !== "matches";
   $("#view-mine").hidden = S.tab !== "mine";
+  $("#view-watched").hidden = S.tab !== "watched";
   const m = matches();
   $("#match-n").hidden = !m.length; $("#match-n").textContent = m.length;
+  if (S.tab === "watched") renderWatched();
   if (S.tab === "deck") renderDeck();
   if (S.tab === "matches") renderMatches(m);
   if (S.tab === "mine") renderMine();
@@ -244,9 +289,14 @@ function updateButtons() {
   $("#btn-undo").disabled = !S.history.length;
 }
 
-function tileHTML(f, { mark = false, sub = true } = {}) {
+function seenPills(kp) {
+  const ps = ["stepan", "yulia"].filter(p => seen(p, kp));
+  return ps.length ? `<span class="seen-pills">${ps.map(p => `<i>✓ ${INITIALS[p]}</i>`).join("")}</span>` : "";
+}
+
+function tileHTML(f, { mark = false, sub = true, pills = false } = {}) {
   return `<button class="tile" data-kp="${f.kp}">
-    <div class="pic"><div class="ph">${esc(f.t)}</div>${img(f.kp, f.t)}${mark ? `<span class="mark"><svg viewBox="0 0 24 24"><path class="fill" d="M12 21s-7.5-4.6-9.6-9.3C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.6 1.1 4.6 2.6 1-1.5 2.5-2.6 4.6-2.6 3.7 0 5.8 3.8 4.3 7.2C19.5 16.4 12 21 12 21z"/></svg></span>` : ""}</div>
+    <div class="pic"><div class="ph">${esc(f.t)}</div>${img(f.kp, f.t)}${pills ? seenPills(f.kp) : ""}${mark ? `<span class="mark"><svg viewBox="0 0 24 24"><path class="fill" d="M12 21s-7.5-4.6-9.6-9.3C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.6 1.1 4.6 2.6 1-1.5 2.5-2.6 4.6-2.6 3.7 0 5.8 3.8 4.3 7.2C19.5 16.4 12 21 12 21z"/></svg></span>` : ""}</div>
     <h4>${esc(f.t)}</h4>${sub ? `<small>${f.y}${f.g ? " · " + esc(f.g) : ""}</small>` : ""}</button>`;
 }
 
@@ -257,8 +307,30 @@ function renderMatches(m) {
       <h3>Пока нет общих фильмов</h3><p class="muted">Когда Степан и Юлия оба выберут «Хочу», фильм появится здесь.</p></div>`;
     return;
   }
-  box.innerHTML = `<p class="muted small" style="margin:4px 0 12px">Оба хотят посмотреть · ${m.length}. Нажмите на фильм, чтобы открыть ссылки или убрать просмотренный.</p>
-    <div class="grid big">${m.map(f => tileHTML(f)).join("")}</div>`;
+  box.innerHTML = `<p class="muted small" style="margin:4px 0 12px">Оба хотят посмотреть · ${m.length}. Посмотрели фильм — откройте его, отметьте «Просмотрено» и поставьте звёзды. Когда отметят оба, фильм переедет во вкладку «Просмотрено».</p>
+    <div class="grid big">${m.map(f => tileHTML(f, { pills: true })).join("")}</div>`;
+}
+
+function renderWatched() {
+  const list = watchedList();
+  const box = $("#watched");
+  if (!list.length) {
+    box.innerHTML = `<div class="list-empty"><div class="badge badge-lg"><span>SV</span><i class="heart"></i><span>UA</span></div>
+      <h3>Пока ничего не посмотрели вместе</h3><p class="muted">Откройте фильм в «Совпадениях» и отметьте «Просмотрено». Когда отметят оба, он появится здесь с общим рейтингом.</p></div>`;
+    return;
+  }
+  const scoreOf = (p, kp) => seen(p, kp)?.s;
+  box.innerHTML = `<p class="muted small" style="margin:4px 0 12px">Посмотрели вместе · ${list.length}. Рейтинг — среднее из оценок Степана и Юлии.</p>
+    <div class="rank">${list.map((f, i) => {
+      const a = avgScore(f.kp), full = scoreOf("stepan", f.kp) && scoreOf("yulia", f.kp);
+      return `<button class="rank-row" data-kp="${f.kp}">
+        <span class="rank-n">${a == null ? "" : i + 1}</span>
+        <div class="pic">${img(f.kp, f.t)}</div>
+        <div class="rank-mid"><h4>${esc(f.t)}</h4><small>${f.y}${f.g ? " · " + esc(f.g) : ""}</small>
+          <small class="rank-who">${["stepan", "yulia"].map(p => `${NAMES[p]} ${scoreOf(p, f.kp) ? "★ " + scoreOf(p, f.kp) : "—"}`).join(" · ")}</small></div>
+        <span class="rank-avg${a == null ? " none" : full ? "" : " part"}"><b>★</b>${fmtAvg(a)}</span>
+      </button>`;
+    }).join("")}</div>`;
 }
 
 function renderMine() {
@@ -402,15 +474,15 @@ function openSheet(kp) {
     <div class="film-head"><div class="pic">${img(kp, f.t)}</div>
       <div><h3>${esc(f.t)}</h3><div class="tags"><span class="tag">${f.y}</span>${f.g ? `<span class="tag">${esc(f.g)}</span>` : ""}<span class="tag">${f.ru ? "Наше кино" : "Дубляж"}</span></div>
       ${partnerLikes ? `<p class="partner">♥ ${NAMES[other(S.me)]} тоже хочет</p>` : ""}</div></div>
+    ${isMatch || seen("stepan", kp) || seen("yulia", kp) ? watchedHTML(kp) : ""}
     <p class="text">${esc(longText(f) || f.d)}</p>
     <div class="links">${linksHTML(f)}</div>
-    <p class="muted small" style="margin:6px 0 0">Ваша оценка</p>
+    ${bothSeen(kp) ? "" : `<p class="muted small" style="margin:6px 0 0">Ваша оценка</p>
     <div class="choice">
       <button data-set="like" class="${r?.l === true ? "on-like" : ""}">♥ Хочу</button>
       <button data-set="nope" class="${r?.l === false ? "on-nope" : ""}">✕ Не хочу</button>
       <button data-set="none">↩ В колоду</button>
-    </div>
-    ${isMatch ? `<button class="menu-item" data-hide="${kp}">Уже посмотрели — убрать из совпадений</button>` : ""}`;
+    </div>`}`;
   $("#sheet").hidden = false;
   $("#sheet-body").onclick = e => {
     const b = e.target.closest("button"); if (!b) return;
@@ -420,6 +492,14 @@ function openSheet(kp) {
       if (v === true && S.ratings[other(S.me)][kp]?.l) S.seenMatches.add(kp);
       closeSheet(); rebuildDeck(); render();
       toast(v === null ? "Фильм вернулся в колоду" : v ? "Отмечено: хочу" : "Отмечено: не хочу");
+    } else if (b.dataset.seen) {
+      const was = bothSeen(kp);
+      setWatched(S.me, kp, seen(S.me, kp) ? undefined : null);
+      afterWatched(kp, was);
+    } else if (b.dataset.star) {
+      const was = bothSeen(kp);
+      setWatched(S.me, kp, +b.dataset.star);
+      afterWatched(kp, was);
     } else if (b.dataset.hide) {
       S.hidden.add(kp); S.queue.push({ op: "hide", kp }); persist(); flushSoon();
       closeSheet(); render();
@@ -428,6 +508,32 @@ function openSheet(kp) {
   };
 }
 function closeSheet() { $("#sheet").hidden = true; }
+
+function watchedHTML(kp) {
+  const me = S.me, pa = other(me), mine = seen(me, kp), his = seen(pa, kp);
+  const a = avgScore(kp);
+  const stars = Array.from({ length: 10 }, (_, i) => i + 1)
+    .map(n => `<button data-star="${n}" class="${mine?.s >= n ? "on" : ""}" aria-label="${n} из 10">★</button>`).join("");
+  const paDone = pa === "yulia" ? "а" : "";
+  const partner = his
+    ? `✓ ${NAMES[pa]} ${WATCHED_VERB[pa]}${his.s ? ` · ★ ${his.s} / 10` : ` · оценку ещё не поставил${paDone}`}`
+    : `${NAMES[pa]} ещё не отметил${paDone} просмотр`;
+  return `<div class="watch">
+    <button class="watch-btn${mine ? " on" : ""}" data-seen="1"><span class="box">${mine ? "✓" : ""}</span>Просмотрено — я ${WATCHED_VERB[me]}</button>
+    <div class="stars-head"><span class="muted small">Моя оценка</span><b>${mine?.s ? mine.s + " / 10" : "не поставлена"}</b></div>
+    <div class="stars">${stars}</div>
+    <p class="watch-partner">${partner}</p>
+    ${mine?.s && his?.s ? `<p class="watch-avg">Общий рейтинг <b>★ ${fmtAvg(a)}</b></p>` : ""}
+  </div>`;
+}
+
+function afterWatched(kp, was) {
+  const now = bothSeen(kp);
+  const y = $("#sheet-body").scrollTop;
+  rebuildDeck(); render(); openSheet(kp); $("#sheet-body").scrollTop = y;
+  if (!was && now) toast("Оба посмотрели — фильм во вкладке «Просмотрено»");
+  else if (was && !now) toast("Отметка снята — фильм вернулся в «Совпадения»");
+}
 
 // ---------- Меню ----------
 function openMenu() {
@@ -471,6 +577,7 @@ function bind() {
   });
   $("#matches").addEventListener("click", e => { const t = e.target.closest(".tile"); if (t) openSheet(+t.dataset.kp); });
   $("#mine").addEventListener("click", e => { const t = e.target.closest(".tile"); if (t) openSheet(+t.dataset.kp); });
+  $("#watched").addEventListener("click", e => { const t = e.target.closest(".rank-row"); if (t) openSheet(+t.dataset.kp); });
   $("#btn-like").addEventListener("click", () => fling(true));
   $("#btn-nope").addEventListener("click", () => fling(false));
   $("#btn-undo").addEventListener("click", undo);
@@ -506,7 +613,7 @@ function bind() {
 
 
 // ---------- iOS 26: в режиме «с экрана Домой» окно считается ниже экрана — растягиваем на весь экран ----------
-const VERSION = 7;
+const VERSION = 8;
 const STANDALONE = window.navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
 const IOS = /iP(hone|od|ad)/.test(navigator.platform) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
 function fitHeight() {

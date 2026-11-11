@@ -1,7 +1,7 @@
 // SVUA: работает без интернета. Оболочка и каталог — из кеша (обновляются в фоне), постеры — кеш после первого показа.
-const SHELL = "svua-shell-v7";
+const SHELL = "svua-shell-v8";
 const POSTERS = "svua-posters-v1";
-const FILES = ["./", "index.html", "style.css?v=7", "app.js?v=7", "config.js?v=7", "films.json", "manifest.webmanifest", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
+const FILES = ["./", "index.html", "style.css?v=8", "app.js?v=8", "config.js?v=8", "films.json", "manifest.webmanifest", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {

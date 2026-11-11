@@ -116,7 +116,7 @@ main { min-height: 0; position: relative; }
 .glow b { font-weight: 900; letter-spacing: .14em; font-size: 15px; }
 
 /* Нижние вкладки */
-.tabs { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); background: rgb(23 18 24 / .96); padding: 6px max(8px, var(--safe-r)) calc(6px + var(--safe-b)) max(8px, var(--safe-l)); }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); background: rgb(23 18 24 / .96); padding: 6px max(8px, var(--safe-r)) calc(6px + var(--safe-b)) max(8px, var(--safe-l)); }
 .tabs button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; color: var(--muted); font-size: 11px; font-weight: 600; }
 .tabs button svg { width: 24px; height: 24px; stroke-width: 2; }
 .tabs button.on { color: var(--coral); }
@@ -191,3 +191,32 @@ main { min-height: 0; position: relative; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
 .debug { margin: 4px 0 0; font: 11px/1.4 ui-monospace, Menlo, monospace; opacity: .7; -webkit-user-select: text; user-select: text; }
+
+/* Просмотрено */
+.seen-pills { position: absolute; left: 6px; bottom: 6px; display: flex; gap: 4px; }
+.seen-pills i { font: 800 11px/1 var(--sans); font-style: normal; padding: 4px 6px; border-radius: 99px; background: rgb(23 18 24 / .85); color: var(--gold); border: 1px solid rgb(250 199 115 / .4); }
+.watch { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: var(--ink); border: 1px solid var(--line); -webkit-user-select: none; user-select: none; }
+.watch-btn { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); font-weight: 700; text-align: left; }
+.watch-btn .box { width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--muted); display: grid; place-items: center; font-weight: 900; flex: none; }
+.watch-btn.on { background: rgb(76 195 138 / .16); color: #8ee0b5; }
+.watch-btn.on .box { background: #4cc38a; border-color: #4cc38a; color: #10261a; }
+.stars-head { display: flex; justify-content: space-between; align-items: baseline; }
+.stars-head b { color: var(--gold); font-size: 15px; }
+.stars { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; }
+.stars button { font-size: 26px; line-height: 1.2; color: var(--line); padding: 2px 0; text-align: center; transition: transform .1s; }
+.stars button.on { color: var(--gold); }
+.stars button:active { transform: scale(1.25); }
+.watch-partner { margin: 0; font-size: 14px; color: var(--muted); }
+.watch-avg { margin: 0; font-size: 16px; } .watch-avg b { color: var(--gold); font-size: 20px; margin-left: 4px; }
+.rank { display: flex; flex-direction: column; gap: 10px; }
+.rank-row { display: flex; align-items: center; gap: 12px; text-align: left; padding: 8px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
+.rank-n { width: 20px; flex: none; text-align: center; font: 900 16px var(--serif); color: var(--muted); }
+.rank-row .pic { width: 52px; aspect-ratio: 2 / 3; flex: none; border-radius: 8px; overflow: hidden; background: linear-gradient(180deg, #4a1a2a, var(--surface-2)); }
+.rank-row .pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rank-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rank-mid h4 { margin: 0; font-size: 15px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rank-mid small { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-mid .rank-who { color: var(--text); opacity: .8; }
+.rank-avg { flex: none; display: flex; align-items: center; gap: 3px; font: 900 22px var(--sans); color: var(--gold); padding-right: 4px; }
+.rank-avg b { font-size: 18px; }
+.rank-avg.part { opacity: .6; } .rank-avg.none { color: var(--muted); font-size: 18px; }
