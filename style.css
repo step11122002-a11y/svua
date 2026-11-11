@@ -31,7 +31,7 @@ svg .fill { fill: currentColor; stroke: none; }
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
 
-#app { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; padding: var(--safe-t) var(--safe-r) 0 var(--safe-l); }
+#app { height: 100%; display: grid; grid-template-rows: auto 1fr auto; padding: var(--safe-t) var(--safe-r) 0 var(--safe-l); }
 
 /* Монограмма SV ♥ UA */
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 0 10px; height: 36px; border-radius: 10px; background: var(--brand);
@@ -191,7 +191,3 @@ main { min-height: 0; position: relative; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
 .debug { margin: 4px 0 0; font: 11px/1.4 ui-monospace, Menlo, monospace; opacity: .7; -webkit-user-select: text; user-select: text; }
-
-/* iOS 26 «с экрана Домой»: окно меньше экрана — все слои на весь экран тянем по --full-h (ставит app.js) */
-.overlay, .glow { bottom: auto; height: var(--full-h, 100%); }
-.glow { top: 0; }

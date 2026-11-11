@@ -506,18 +506,18 @@ function bind() {
 
 
 // ---------- iOS 26: в режиме «с экрана Домой» окно считается ниже экрана — растягиваем на весь экран ----------
-const VERSION = 4;
+const VERSION = 5;
 const STANDALONE = window.navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
 const IOS = /iP(hone|od|ad)/.test(navigator.platform) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
 function fitHeight() {
-  const app = $("#app");
-  if (!(STANDALONE && IOS)) { app.style.height = ""; document.documentElement.style.removeProperty("--full-h"); return; }
+  // iOS 26 не рисует веб-приложение у самого низа экрана: окно короче экрана, и место под полоской «Домой» уже оставлено системой.
+  // Тогда собственный отступ под вкладками (safe-area-inset-bottom) лишний — обнуляем его.
+  const root = document.documentElement;
+  if (!(STANDALONE && IOS)) { root.style.removeProperty("--safe-b"); return; }
   const landscape = Math.abs(window.orientation || 0) === 90;
   const full = landscape ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
-  const h = Math.max(window.innerHeight, full) + "px";
-  app.style.bottom = "auto";
-  app.style.height = h;
-  document.documentElement.style.setProperty("--full-h", h);   // для меню, оверлеев и подсветки
+  if (window.innerHeight < full - 20) root.style.setProperty("--safe-b", "0px");
+  else root.style.removeProperty("--safe-b");
 }
 function screenInfo() {
   const probe = document.createElement("div");
