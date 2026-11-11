@@ -436,6 +436,7 @@ function openMenu() {
   $("#menu-sync").textContent = st + (S.queue.length ? ` (в очереди: ${S.queue.length})` : "");
   $("#menu-stats").textContent = `В каталоге ${S.films.length} фильмов. Вы оценили ${Object.keys(S.ratings[S.me]).length}, ${NAMES[other(S.me)]} — ${Object.keys(S.ratings[other(S.me)]).length}.`;
   $("#reset-confirm").hidden = true;
+  $("#menu-debug").textContent = screenInfo();
   $("#menu").hidden = false;
   pull();
 }
@@ -503,10 +504,32 @@ function bind() {
   setInterval(() => { if (document.visibilityState === "visible") pull(); }, 20000);
 }
 
+
+// ---------- iOS 26: в режиме «с экрана Домой» окно считается ниже экрана — растягиваем на весь экран ----------
+const VERSION = 3;
+const STANDALONE = window.navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+const IOS = /iP(hone|od|ad)/.test(navigator.platform) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+function fitHeight() {
+  const app = $("#app");
+  if (!(STANDALONE && IOS)) { app.style.height = ""; return; }
+  const landscape = Math.abs(window.orientation || 0) === 90;
+  const full = landscape ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+  app.style.bottom = "auto";
+  app.style.height = Math.max(window.innerHeight, full) + "px";
+}
+function screenInfo() {
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;top:0;height:env(safe-area-inset-bottom,0px);width:0;visibility:hidden";
+  document.body.appendChild(probe); const sb = probe.getBoundingClientRect().height; probe.remove();
+  const r = $("#app").getBoundingClientRect();
+  return `v${VERSION} · экран ${screen.width}×${screen.height} · окно ${innerWidth}×${innerHeight} · vv ${Math.round(visualViewport?.height || 0)} · app ${Math.round(r.top)}–${Math.round(r.bottom)} · низ ${sb} · ${STANDALONE ? "домой" : "браузер"}`;
+}
+
 // ---------- Запуск ----------
 async function start() {
   bind();
   setSync(S.sync);
+  fitHeight(); addEventListener("resize", fitHeight); addEventListener("orientationchange", () => setTimeout(fitHeight, 300));
   try {
     const r = await fetch("films.json");
     S.films = await r.json();
@@ -519,6 +542,10 @@ async function start() {
   rebuildDeck(false);
   render();
   pull();
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController) location.reload(); });
+    navigator.serviceWorker.register("sw.js").then(r => r.update()).catch(() => {});
+  }
 }
 start();

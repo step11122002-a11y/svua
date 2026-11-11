@@ -1,7 +1,7 @@
 // SVUA: работает без интернета. Оболочка и каталог — из кеша (обновляются в фоне), постеры — кеш после первого показа.
-const SHELL = "svua-shell-v2";
+const SHELL = "svua-shell-v3";
 const POSTERS = "svua-posters-v1";
-const FILES = ["./", "index.html", "style.css?v=2", "app.js?v=2", "config.js?v=2", "films.json", "manifest.webmanifest", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
+const FILES = ["./", "index.html", "style.css?v=3", "app.js?v=3", "config.js?v=3", "films.json", "manifest.webmanifest", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {
@@ -18,9 +18,13 @@ self.addEventListener("fetch", e => {
     return;
   }
   if (url.origin !== location.origin) return;           // база оценок и прочее — напрямую
-  e.respondWith(caches.open(SHELL).then(async c => {    // свои файлы: сразу из кеша, параллельно обновляем
-    const hit = await c.match(e.request, { ignoreSearch: false });
-    const net = fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }).catch(() => hit);
-    return hit || net;
+  e.respondWith(caches.open(SHELL).then(async c => {    // свои файлы: сначала сеть (быстрые обновления), без интернета — из кеша
+    try {
+      const r = await fetch(e.request, { cache: "no-cache" });
+      if (r.ok) c.put(e.request, r.clone());
+      return r;
+    } catch {
+      return (await c.match(e.request)) || (await c.match("./"));
+    }
   }));
 });

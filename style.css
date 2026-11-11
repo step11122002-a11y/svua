@@ -189,3 +189,5 @@ main { min-height: 0; position: relative; }
   .card h2 { font-size: 21px; } .desc { -webkit-line-clamp: 3; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+.debug { margin: 4px 0 0; font: 11px/1.4 ui-monospace, Menlo, monospace; opacity: .7; -webkit-user-select: text; user-select: text; }
