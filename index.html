@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>SVUA</title>
+<meta name="description" content="Степан и Юлия выбирают кино вдвоём">
+<meta name="theme-color" content="#171218">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SVUA">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<div id="app">
+  <!-- Кто вы? -->
+  <section id="who" class="who" hidden>
+    <div class="badge badge-xl"><span>SV</span><i class="heart"></i><span>UA</span></div>
+    <h1>Кто выбирает на этом телефоне?</h1>
+    <p class="muted">Это нужно один раз. Оценки каждого видны второму только как общие совпадения.</p>
+    <div class="who-buttons">
+      <button class="who-btn" data-who="stepan"><b>SV</b><span>Степан</span></button>
+      <button class="who-btn" data-who="yulia"><b>UA</b><span>Юлия</span></button>
+    </div>
+  </section>
+
+  <!-- Основной экран -->
+  <header id="top" class="top" hidden>
+    <div class="badge"><span>SV</span><i class="heart"></i><span>UA</span></div>
+    <div class="top-mid">
+      <div class="seg" id="origin" role="tablist" aria-label="Какие фильмы показывать">
+        <button data-origin="all">Все</button>
+        <button data-origin="ru">Наши</button>
+        <button data-origin="foreign">Зарубежные</button>
+      </div>
+    </div>
+    <button id="me-btn" class="me-btn" aria-label="Меню"><span id="me-initials">SV</span><i id="sync-dot" class="dot"></i></button>
+  </header>
+
+  <main id="main" hidden>
+    <section id="view-deck" class="view deck-view">
+      <div class="deck" id="deck"></div>
+      <div class="actions">
+        <button class="round nope" id="btn-nope" aria-label="Не хочу (←)"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button class="round undo" id="btn-undo" aria-label="Вернуть"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></button>
+        <button class="round like" id="btn-like" aria-label="Хочу посмотреть (→)"><svg viewBox="0 0 24 24"><path class="fill" d="M12 21s-7.5-4.6-9.6-9.3C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.6 1.1 4.6 2.6 1-1.5 2.5-2.6 4.6-2.6 3.7 0 5.8 3.8 4.3 7.2C19.5 16.4 12 21 12 21z"/></svg></button>
+      </div>
+    </section>
+
+    <section id="view-matches" class="view list-view" hidden>
+      <div id="matches"></div>
+    </section>
+
+    <section id="view-mine" class="view list-view" hidden>
+      <div class="seg seg-wide" id="mine-filter">
+        <button data-mine="like">Хочу · <span id="mine-like-n">0</span></button>
+        <button data-mine="nope">Не хочу · <span id="mine-nope-n">0</span></button>
+      </div>
+      <div id="mine"></div>
+    </section>
+  </main>
+
+  <nav id="tabs" class="tabs" hidden>
+    <button data-tab="deck"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 3.5L4 6v13l5 2"/></svg><span>Выбор</span></button>
+    <button data-tab="matches"><svg viewBox="0 0 24 24"><path d="M12 20s-6.5-4-8.3-8c-1.3-3 .5-6.3 3.7-6.3 1.8 0 3.1 1 4 2.2.9-1.2 2.2-2.2 4-2.2 3.2 0 5 3.3 3.7 6.3-1.8 4-7.1 8-7.1 8z"/></svg><span>Совпадения</span><em id="match-n" class="count" hidden>0</em></button>
+    <button data-tab="mine"><svg viewBox="0 0 24 24"><path d="M5 4h14v17l-7-4-7 4z"/></svg><span>Мой выбор</span></button>
+  </nav>
+
+  <!-- Подсветка краёв при свайпе -->
+  <div class="glow glow-nope" id="glow-nope"><div><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><b>НЕТ</b></div></div>
+  <div class="glow glow-like" id="glow-like"><div><svg viewBox="0 0 24 24"><path class="fill" d="M12 21s-7.5-4.6-9.6-9.3C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.6 1.1 4.6 2.6 1-1.5 2.5-2.6 4.6-2.6 3.7 0 5.8 3.8 4.3 7.2C19.5 16.4 12 21 12 21z"/></svg><b>ХОЧУ</b></div></div>
+
+  <!-- Совпадение! -->
+  <div id="match-overlay" class="overlay" hidden>
+    <div class="match-box">
+      <div class="badge badge-lg"><span>SV</span><i class="heart"></i><span>UA</span></div>
+      <h2>Совпадение!</h2>
+      <p class="muted">Степан и Юлия оба хотят посмотреть</p>
+      <div class="match-poster" id="match-poster"></div>
+      <h3 id="match-title"></h3>
+      <div class="links" id="match-links"></div>
+      <button class="primary" id="match-close">Продолжить выбирать</button>
+    </div>
+  </div>
+
+  <!-- Карточка фильма из списков -->
+  <div id="sheet" class="overlay sheet-wrap" hidden>
+    <div class="sheet" role="dialog" aria-modal="true">
+      <div class="sheet-grip"></div>
+      <div class="sheet-body" id="sheet-body"></div>
+    </div>
+  </div>
+
+  <!-- Меню -->
+  <div id="menu" class="overlay sheet-wrap" hidden>
+    <div class="sheet" role="dialog" aria-modal="true">
+      <div class="sheet-grip"></div>
+      <div class="sheet-body menu-body">
+        <p class="menu-who">На этом телефоне выбирает <b id="menu-name"></b></p>
+        <p class="menu-sync" id="menu-sync"></p>
+        <p class="muted small" id="menu-stats"></p>
+        <button class="menu-item" id="menu-switch">Сменить участника</button>
+        <button class="menu-item danger" id="menu-reset">Стереть мой выбор…</button>
+        <div class="confirm" id="reset-confirm" hidden>
+          <p>Все ваши оценки удалятся, фильмы вернутся в колоду. Выбор второго участника останется.</p>
+          <div class="row">
+            <button class="menu-item" id="reset-no">Отмена</button>
+            <button class="menu-item danger solid" id="reset-yes">Стереть</button>
+          </div>
+        </div>
+        <button class="menu-item" id="menu-close">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+</div>
+<script src="config.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
